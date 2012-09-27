@@ -1,9 +1,6 @@
 #!/usr/bin/env python
-
-
 from pyatspi import Registry as registry
 from pyatspi import (KEY_SYM, KEY_PRESS, KEY_PRESSRELEASE, KEY_RELEASE)
-
 import pygtk
 pygtk.require('2.0')
 import gtk, sys, cairo
@@ -11,48 +8,37 @@ from math import pi
 
 from time import sleep
 
-
-#def click (x, y, button = 1):
-#    """
-#    Synthesize a mouse button click at (x,y)
-#    """
-#    print("Mouse button %s click at (%s,%s)"%(button,x,y))
-#    registry.generateMouseEvent(x, y, 'b%sc' % button)
-#    
-#def doubleClick (x, y, button = 1):
-#    """
-#    Synthesize a mouse button double-click at (x,y)
-#    """
-#    print("Mouse button %s doubleclick at (%s,%s)"%(button,x,y))
-#    registry.generateMouseEvent(x,y, 'b%sd' % button)
-
-class App():
+class App(gtk.Window):
 
     iteration = -1
     hack_iteration = 0
     dx = 0
     dy = 0
     history = {}
-
+    reverse_dict = {
+        '1': 7, '2': 8, '3': 9,
+        '4': 4, '5': 5, '6': 6,
+        '7': 1, '8': 2, '9': 3,
+    }
     def __init__(self, argv):
-        self.win = gtk.Window()
-        win = self.win
+        super(App, self).__init__()
 #        self.cr = self.win.cairo_create()
-        win.set_decorated(False)
+        self.set_decorated(False)
         # Makes the window paintable, so we can draw directly on it
-        win.set_app_paintable(True)
+        self.set_app_paintable(True)
 #        win.set_size_request(100, 100)
-        win.fullscreen()
+        self.fullscreen()
+        gtk.gdk.flush()
         # This sets the windows colormap, so it supports transparency.
         # This will only work if the wm support alpha channel
-        screen = win.get_screen()
+        screen = self.get_screen()
         rgba = screen.get_rgba_colormap()
-        win.set_colormap(rgba)
+        self.set_colormap(rgba)
 
-        self.win.connect('expose-event', self.redraw)
-        self.win.connect("delete-event", gtk.main_quit)
-        self.win.connect('key-press-event', self.select)
-        self.win.show()
+        self.connect('expose-event', self.redraw)
+        self.connect("delete-event", gtk.main_quit)
+        self.connect('key-press-event', self.select)
+        self.show()
         gtk.main()
 
     def rectangle(self, cr, x1, y1, x2, y2):
@@ -66,7 +52,6 @@ class App():
         cr.line_to(x1, y1)
 
     def draw_grid(self, x, y, w, h):
-#        w, h = widget.get_size()
         cr = self.cr
         
         cr.set_operator(cairo.OPERATOR_CLEAR)
@@ -96,73 +81,70 @@ class App():
                 y1 = int(j*h/3) + y
                 x2 = int( (i+1)*w/3 ) + x
                 y2 = int( (j+1)*h/3 ) + y
-#                print "draw", (x1, y1, x2, y2)
                 self.rectangle(cr, x1, y1, x2, y2)
         cr.stroke()
         
 
-    def get_rectangle_size(self)
+    def get_rectangle_size(self):
         return self.w*(1./3**self.iteration), self.h*(1./3**self.iteration)
         
+    def widow_hide(self):
+        self.hide()
+        gtk.gdk.flush()
     
-    def redraw(self, widget, event):
-        print "redraw"
-        self.cr = widget.window.cairo_create()
-        cr = self.cr
-        self.w, self.h = widget.get_size()
+    def signum(self, x):
+        return (x > 0) - (x < 0)
 
-        print "calling position"
+    def get_center(self):
+        w, h = self.get_rectangle_size()
+        return (self.dx + w/2, self.dy + h/2)
+
+    def redraw(self, widget, event):
+        self.cr = widget.window.cairo_create()
+        self.w, self.h = widget.get_size()
         if self.hack_iteration == 0:
             self.hack_iteration +=1
         elif self.hack_iteration == 1:
             self.down()
 
     def click (self, button = 1):
-        self.win.hide()
-        gtk.gdk.flush()
-        
-        w, h = self.get_rectangle_size()
-        print "click", self.dx + w/2, self.dy + h/2
-        registry.generateMouseEvent(self.dx + w/2, self.dy + h/2, 'b%sc' % button)
-        gtk.main_quit()
+        self.widow_hide()
+        x,y = self.get_center()
+        registry.generateMouseEvent(x, y, 'b%sc' % button)
         
     def double_click(self, button = 1):
-        self.win.hide()
-        gtk.gdk.flush()
-        w, h = self.get_rectangle_size()
-        print "click", self.dx + w/2, self.dy + h/2
-        registry.generateMouseEvent(self.dx + w/2, self.dy + h/2, 'b%sd' % button)
-        gtk.main_quit()
+        self.widow_hide()
+        x,y = self.get_center()
+        registry.generateMouseEvent(x, y, 'b%sd' % button)
+        
+    def point(self):
+        x,y = self.get_center()
+        registry.generateMouseEvent(x, y, 'abs')
 
     def down(self, choice=1, iteration=None):
         print "down iteration", self.iteration
-
         self.iteration += 1
         if iteration is not None:
             self.iteration = iteration
-            
-#        w, h = self.w*(1./3**self.iteration), self.h*(1./3**self.iteration)
-        print "down saving to history", self.iteration, self.dx, self.dy, choice
-        dx =self.dx + (choice-1)%3*w
-        dy =self.dy + (choice-1)/3*h
+        w, h = self.get_rectangle_size()
+        dx =(self.dx + (choice-1)%3*w)*self.signum(self.iteration)
+        dy =(self.dy + (choice-1)/3*h)*self.signum(self.iteration)
         self.history[str(self.iteration)] = (dx, dy,choice)
-        
-        print "down", (dx, dy, w, h)
-        self.draw_grid(dx, dy, **self.get_rectangle_size())
-        self.dx, self.dy = dx, dy
-        return (w/2, h/2)
-    
-    def up(self):
-        self.iteration -=1
-        w, h = self.w*(1./3**self.iteration), self.h*(1./3**self.iteration)
-        dx, dy, choice = self.history[str(self.iteration)]
-        if self.iteration == 0:
-            w, h = self.w, self.h
-            dx, dy = 0, 0
-        print "up iteration", self.iteration, dx, dy, w, h
-        print "up", (dx, dy, w, h)
         self.draw_grid(dx, dy, w, h)
         self.dx, self.dy = dx, dy
+        self.point()
+        return (w/2, h/2)
+
+    def up(self):
+        try:
+            dx, dy, choice = self.history[str(self.iteration-1)]
+            self.iteration -=1
+            w, h = self.get_rectangle_size()
+            self.draw_grid(dx, dy, w, h)
+            self.dx, self.dy = dx, dy
+            self.point()
+        except KeyError:
+            pass
     
     def select(self, widget, event):
         key = event.keyval
@@ -170,22 +152,20 @@ class App():
             gtk.main_quit()
         elif key == gtk.keysyms.space or key == gtk.keysyms.KP_Enter or key == gtk.keysyms.KP_Equal:
             self.click()
+            gtk.main_quit()
         elif key == gtk.keysyms.KP_0:
             self.double_click()
+            gtk.main_quit()
+        elif key == gtk.keysyms.KP_Decimal:
+            self.click(button=3)
+            gtk.main_quit()
         elif key == gtk.keysyms.BackSpace:
             self.up()
         elif gtk.keysyms.KP_1 <= key <= gtk.keysyms.KP_9:
             self.cr = widget.window.cairo_create()
             num = event.keyval - gtk.keysyms.KP_1 + 1
-            reverse_dict = {
-                '1': 7, '2': 8, '3': 9,
-                '4': 4, '5': 5, '6': 6,
-                '7': 1, '8': 2, '9': 3,  
-            }
-            print "select", widget, event.keyval, gtk.keysyms.KP_1 
-            self.down(reverse_dict[str(num)])
+            self.down(self.reverse_dict[str(num)])
         elif key == gtk.keysyms.Home:
-            print "home"
             self.down(iteration=0)
         else:
             pass
