@@ -1,10 +1,13 @@
 #!/usr/bin/env python
 from pyatspi import Registry as registry
 from pyatspi import (KEY_SYM, KEY_PRESS, KEY_PRESSRELEASE, KEY_RELEASE)
-import pygtk
-pygtk.require('2.0')
-import gtk, sys, cairo
-from math import pi
+#import pygtk
+#pygtk.require('2.0')
+import sys, cairo
+
+from gi.repository import Gtk as gtk
+from gi.repository import Gdk as gdk
+
 
 from time import sleep
 
@@ -24,22 +27,35 @@ class App(gtk.Window):
         super(App, self).__init__()
 #        self.cr = self.win.cairo_create()
         self.set_decorated(False)
-        # Makes the window paintable, so we can draw directly on it
-        self.set_app_paintable(True)
 #        win.set_size_request(100, 100)
         self.fullscreen()
-        gtk.gdk.flush()
+#        gdk.flush()
         # This sets the windows colormap, so it supports transparency.
         # This will only work if the wm support alpha channel
         screen = self.get_screen()
-        rgba = screen.get_rgba_colormap()
-        self.set_colormap(rgba)
+        rgba = screen.get_rgba_visual()
+        self.set_visual(rgba)
+        self.set_app_paintable(True)
 
-        self.connect('expose-event', self.redraw)
+        self.drawing_area = gtk.DrawingArea()
+        
+        self.drawing_area.connect('draw', self.redraw)
         self.connect("delete-event", gtk.main_quit)
         self.connect('key-press-event', self.select)
-        self.show()
+        
+        self.add(self.drawing_area)
+        self.show_all()
         gtk.main()
+
+    def redraw(self, widget, cr):
+        print "redraw"
+        self.cr = cr
+        print self.get_size()
+        self.w, self.h = self.get_size()
+        if self.hack_iteration == 0:
+            self.hack_iteration +=1
+        elif self.hack_iteration == 1:
+            self.down()
 
     def rectangle(self, cr, x1, y1, x2, y2):
         cr.move_to(x1, y1)
@@ -52,18 +68,23 @@ class App(gtk.Window):
         cr.line_to(x1, y1)
 
     def draw_grid(self, x, y, w, h):
+#        import ipdb; ipdb.set_trace()
         cr = self.cr
-        
-        cr.set_operator(cairo.OPERATOR_CLEAR)
-        cr.rectangle(0.0, 0.0, self.w, self.h)
-        cr.fill()
-        cr.set_operator(cairo.OPERATOR_OVER)
+        print cr
+#        gdk.flush()
+#        self.draw(cr)
+#        cr.set_operator(cairo.OPERATOR_CLEAR)
+#        cr.paint()
+##        cr.rectangle(0.0, 0.0, self.w, self.h)
+##        cr.fill()
+#        cr.set_operator(cairo.OPERATOR_OVER)
         
         cr.set_source_rgba(0.0,1.0,1.0,0.1)
-        cr.rectangle(0.0, 0.0, self.w, self.h)
-        cr.fill()
+        cr.paint()
+#        cr.rectangle(0.0, 0.0, self.w, self.h)
+#        cr.fill()
         
-        cr.set_operator(cairo.OPERATOR_CLEAR)
+        cr.set_operator(cairo.OPERATOR_SOURCE)
         cr.rectangle(int(x), int(y), int(w), int(h))
         cr.fill()
         cr.set_operator(cairo.OPERATOR_OVER)
@@ -71,10 +92,12 @@ class App(gtk.Window):
         cr.rectangle(int(x), int(y), int(w), int(h))
         cr.fill()
         
+#        import ipdb; ipdb.set_trace()
         border = (w/500 + 0.1)
         print "draw", x, y, w, h, "border", border
         cr.set_line_width(border)
         cr.set_source_rgba(1.0, 1.0, 1.0, 0.8)
+        
         for i in range (0,3):
             for j in range(0,3):
                 x1 = int(i*w/3) + x
@@ -84,13 +107,16 @@ class App(gtk.Window):
                 self.rectangle(cr, x1, y1, x2, y2)
         cr.stroke()
         
+#        self.drawing_area.queue_draw()
+#        import ipdb; ipdb.set_trace()
+        
 
     def get_rectangle_size(self):
         return self.w*(1./3**self.iteration), self.h*(1./3**self.iteration)
         
     def widow_hide(self):
         self.hide()
-        gtk.gdk.flush()
+        gdk.flush()
     
     def signum(self, x):
         return (x > 0) - (x < 0)
@@ -98,14 +124,6 @@ class App(gtk.Window):
     def get_center(self):
         w, h = self.get_rectangle_size()
         return (self.dx + w/2, self.dy + h/2)
-
-    def redraw(self, widget, event):
-        self.cr = widget.window.cairo_create()
-        self.w, self.h = widget.get_size()
-        if self.hack_iteration == 0:
-            self.hack_iteration +=1
-        elif self.hack_iteration == 1:
-            self.down()
 
     def click (self, button = 1):
         self.widow_hide()
@@ -147,25 +165,29 @@ class App(gtk.Window):
             pass
     
     def select(self, widget, event):
+        print "select", event.keyval
         key = event.keyval
-        if key == gtk.keysyms.Escape:
+#        import ipdb; ipdb.set_trace()
+        gtk.keysyms = gdk
+        if key == gtk.keysyms.KEY_Escape:
             gtk.main_quit()
-        elif key == gtk.keysyms.space or key == gtk.keysyms.KP_Enter or key == gtk.keysyms.KP_Equal:
+        elif key == gtk.keysyms.KEY_space or key == gtk.keysyms.KEY_KP_Enter or key == gtk.keysyms.KEY_KP_Equal:
             self.click()
             gtk.main_quit()
-        elif key == gtk.keysyms.KP_0:
+        elif key == gtk.keysyms.KEY_KP_0:
             self.double_click()
             gtk.main_quit()
-        elif key == gtk.keysyms.KP_Decimal:
+        elif key == gtk.keysyms.KEY_KP_Decimal:
             self.click(button=3)
             gtk.main_quit()
-        elif key == gtk.keysyms.BackSpace:
+        elif key == gtk.keysyms.KEY_BackSpace:
             self.up()
-        elif gtk.keysyms.KP_1 <= key <= gtk.keysyms.KP_9:
-            self.cr = widget.window.cairo_create()
-            num = event.keyval - gtk.keysyms.KP_1 + 1
+        elif gtk.keysyms.KEY_KP_1 <= key <= gtk.keysyms.KEY_KP_9:
+            
+#            self.cr = widget.window.cairo_create()
+            num = event.keyval - gtk.keysyms.KEY_KP_1 + 1
             self.down(self.reverse_dict[str(num)])
-        elif key == gtk.keysyms.Home:
+        elif key == gtk.keysyms.KEY_Home:
             self.down(iteration=0)
         else:
             pass
