@@ -101,12 +101,15 @@ class App():
         cr.stroke()
         
 
+    def get_rectangle_size(self)
+        return self.w*(1./3**self.iteration), self.h*(1./3**self.iteration)
+        
+    
     def redraw(self, widget, event):
         print "redraw"
         self.cr = widget.window.cairo_create()
         cr = self.cr
         self.w, self.h = widget.get_size()
-#        self.wi, self.hi = self.w, self.h
 
         print "calling position"
         if self.hack_iteration == 0:
@@ -118,16 +121,15 @@ class App():
         self.win.hide()
         gtk.gdk.flush()
         
-        w, h = self.w*(1./3**self.iteration), self.h*(1./3**self.iteration)
+        w, h = self.get_rectangle_size()
         print "click", self.dx + w/2, self.dy + h/2
         registry.generateMouseEvent(self.dx + w/2, self.dy + h/2, 'b%sc' % button)
         gtk.main_quit()
         
-    def double_click (self, button = 1):
+    def double_click(self, button = 1):
         self.win.hide()
         gtk.gdk.flush()
-        
-        w, h = self.w*(1./3**self.iteration), self.h*(1./3**self.iteration)
+        w, h = self.get_rectangle_size()
         print "click", self.dx + w/2, self.dy + h/2
         registry.generateMouseEvent(self.dx + w/2, self.dy + h/2, 'b%sd' % button)
         gtk.main_quit()
@@ -139,14 +141,14 @@ class App():
         if iteration is not None:
             self.iteration = iteration
             
-        w, h = self.w*(1./3**self.iteration), self.h*(1./3**self.iteration)
+#        w, h = self.w*(1./3**self.iteration), self.h*(1./3**self.iteration)
         print "down saving to history", self.iteration, self.dx, self.dy, choice
         dx =self.dx + (choice-1)%3*w
         dy =self.dy + (choice-1)/3*h
         self.history[str(self.iteration)] = (dx, dy,choice)
         
         print "down", (dx, dy, w, h)
-        self.draw_grid(dx, dy, w, h)
+        self.draw_grid(dx, dy, **self.get_rectangle_size())
         self.dx, self.dy = dx, dy
         return (w/2, h/2)
     
